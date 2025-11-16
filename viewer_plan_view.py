@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-viewer_plan_view_ctk.py  (all-white background)
-
-Requires:
-    pip install customtkinter shapely matplotlib
-"""
-
 import os, json
 import customtkinter as ctk
 import tkinter as tk
@@ -119,9 +110,9 @@ class Viewer(ctk.CTk):
 
         self.title("ResPlan – Modern View Quality Viewer")
         self.geometry("1400x900")
-        self.configure(fg_color="white")  # root background
+        self.configure(fg_color="white")
 
-        # ttk Treeview style → white
+
         style = ttk.Style()
         style.theme_use("default")
         style.configure("Treeview",
@@ -132,7 +123,7 @@ class Viewer(ctk.CTk):
                         background="white",
                         foreground="black")
 
-        # data
+
         self.folder = None
         self.files = []
         self.plan = None
@@ -155,7 +146,7 @@ class Viewer(ctk.CTk):
         self._build_sliders()
         self._build_tabs()
 
-    # ───────────────────────────────── UI BUILDING
+
 
     def _build_top(self):
         top = ctk.CTkFrame(self, corner_radius=0, fg_color="white")
@@ -251,7 +242,7 @@ class Viewer(ctk.CTk):
         tab_plan.configure(fg_color="white")
         tab_view.configure(fg_color="white")
 
-        # Plan tab
+
         left = ctk.CTkFrame(tab_plan, fg_color="white")
         left.pack(side="left", fill="y", padx=(0, 8), pady=4)
         ctk.CTkLabel(left, text="Plans",
@@ -271,7 +262,7 @@ class Viewer(ctk.CTk):
         self.canvas_plan = FigureCanvasTkAgg(self.fig_plan, master=right)
         self.canvas_plan.get_tk_widget().pack(fill="both", expand=True)
 
-        # View tab
+
         top_v = ctk.CTkFrame(tab_view, fg_color="white")
         top_v.pack(side="top", fill="both", expand=True, pady=(4, 2))
 
@@ -302,7 +293,7 @@ class Viewer(ctk.CTk):
             bottom_v, text="Average view score: n/a", fg_color="white")
         self.lbl_avg.pack(side="left", padx=10, pady=4)
 
-    # ────────────────────────────── SLIDER CALLBACKS
+
 
     def _on_basic_slider(self, *_):
         self.lbl_grey.configure(text=f"{int(self.grid_grey.get())}")
@@ -326,7 +317,7 @@ class Viewer(ctk.CTk):
         self.lbl_cell.configure(text=f"{self.cell_scale.get():.2f}")
         self.render_view()
 
-    # ────────────────────────────── IO
+
 
     def choose_folder(self):
         folder = filedialog.askdirectory(title="Select folder with JSON plans")
@@ -363,7 +354,7 @@ class Viewer(ctk.CTk):
         self.render_plan()
         self.render_view()
 
-    # ────────────────────────────── DRAW HELPERS
+
 
     def _draw_polycollection(self, ax, geom, face, edge="#333333",
                              alpha=0.75, lw=0.8):
@@ -423,7 +414,7 @@ class Viewer(ctk.CTk):
         except Exception:
             pass
 
-    # ────────────────────────────── PLAN RENDER
+
 
     def render_plan(self):
         ax = self.ax_plan
@@ -505,7 +496,7 @@ class Viewer(ctk.CTk):
 
         self.canvas_plan.draw()
 
-    # ────────────────────────────── VIEW CALC + RENDER
+
 
     def compute_view_grid(self):
         self.view_samples = []
@@ -621,7 +612,7 @@ class Viewer(ctk.CTk):
         else:
             self.lbl_avg.configure(text="Average view score: n/a")
 
-    # ────────────────────────────── SAVE
+
 
     def save_plan_png(self):
         if not self.layers:
@@ -649,3 +640,4 @@ class Viewer(ctk.CTk):
 if __name__ == "__main__":
     app = Viewer()
     app.mainloop()
+
