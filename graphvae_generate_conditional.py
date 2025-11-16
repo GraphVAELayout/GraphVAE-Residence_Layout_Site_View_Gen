@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv, GATConv
 
-# =================== PATHS ===================
+
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
 NPY_DIR    = os.path.join(OUTPUT_DIR, "npy_dataset")
@@ -17,13 +17,13 @@ os.makedirs(GEN_DIR, exist_ok=True)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# match training hyperparams from graphvae_train.py
+
 HID_DIM   = 64
 Z_DIM     = 32
 GAT_HEADS = 4
 
 
-# =================== MODEL (same as training) ===================
+
 class GraphEncoder(nn.Module):
     def __init__(self, in_dim, hid_dim, z_dim, heads=4):
         super().__init__()
@@ -70,7 +70,7 @@ class GraphVAE(nn.Module):
         return self.encoder(x, edge_index)
 
 
-# =================== HELPERS ===================
+
 def load_normalization(path):
     arr = np.load(path)
     mean = torch.from_numpy(arr["mean"]).float()
@@ -79,27 +79,6 @@ def load_normalization(path):
 
 
 def build_features(num_nodes, total_area, view_score_percent, wwr=0.4):
-    """
-    Build synthetic node features in the SAME 11-dim format:
-
-    0: inside_flag
-    1: outside_flag
-    2: area
-    3: bw
-    4: bh
-    5: bminx
-    6: bminy
-    7: bmaxx
-    8: bmaxy
-    9: WWR
-    10: view_score
-
-    - First (num_nodes - 4) nodes = inside rooms (if possible)
-    - Last up to 4 nodes = outside façade nodes
-    - total_area distributed across inside rooms
-    - view_score of inside rooms chosen to match target graph score
-    """
-    # assume up to 4 outside nodes
     num_outside = 4 if num_nodes >= 4 else max(0, num_nodes - 1)
     num_inside = num_nodes - num_outside
     if num_inside <= 0:
@@ -114,7 +93,7 @@ def build_features(num_nodes, total_area, view_score_percent, wwr=0.4):
     node_names = []
     node_meta = []
 
-    # place rooms along x axis
+
     cursor_x = 0.0
     side = math.sqrt(area_per_room)
     spacing = side * 0.1
@@ -150,7 +129,7 @@ def build_features(num_nodes, total_area, view_score_percent, wwr=0.4):
             wwr_val, view_score
         ])
 
-    # outside nodes (similar to prep_gui semantics)
+
     outside_types = ["sky", "vegetation", "context", "building"]
     view_weights = {"sky": 1.0, "vegetation": 0.8, "context": 0.4, "building": 0.2}
 
@@ -181,7 +160,7 @@ def build_features(num_nodes, total_area, view_score_percent, wwr=0.4):
 
     X = np.array(X, dtype=np.float32)
 
-    # graph-level score = area-weighted avg of inside nodes (like compute_graph_score)
+
     areas = X[:num_inside, 2]
     v_scores = X[:num_inside, 10]
     if areas.sum() > 0:
@@ -214,19 +193,19 @@ def generate_graph():
 
     X_raw, node_names, node_meta, Z = build_features(num_nodes, total_area, view_score)
 
-    # normalize features
+
     mean_v = mean.view(1, -1)
     std_v = std.view(1, -1)
     X_norm = (torch.from_numpy(X_raw) - mean_v) / std_v
     X_norm = X_norm.to(DEVICE)
 
-    # sample latent z ~ N(0, I) and decode adjacency
+
     z = torch.randn((num_nodes, Z_DIM), device=DEVICE)
     with torch.no_grad():
         logits = model.decoder(z)
         probs = torch.sigmoid(logits).cpu().numpy()
 
-    # symmetric adjacency, no self-loops
+
     probs = (probs + probs.T) / 2.0
     np.fill_diagonal(probs, 0.0)
     threshold = 0.5
@@ -236,7 +215,6 @@ def generate_graph():
     A = []
     E = []
     for u, v in zip(us.tolist(), vs.tolist()):
-        # edge type: 0 = room-room, 1 = involves outside (same semantics as prep script)
         inside_u = X_raw[u, 0] > X_raw[u, 1]
         inside_v = X_raw[v, 0] > X_raw[v, 1]
         etype = 0 if (inside_u and inside_v) else 1
@@ -255,7 +233,7 @@ def generate_graph():
         "E": E,
     }
 
-    # pick new filename
+
     idx = 0
     while True:
         out_name = f"cond_plan_{idx:04d}_graph.json"
@@ -273,3 +251,4 @@ def generate_graph():
 
 if __name__ == "__main__":
     generate_graph()
+
