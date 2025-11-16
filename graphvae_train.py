@@ -1,5 +1,3 @@
-# graphvae_train.py
-
 import os
 import json
 import numpy as np
@@ -10,16 +8,12 @@ from torch_geometric.data import Data
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GCNConv, GATConv
 
-# ============================================================
-# USER SETTINGS
-# ============================================================
-PADDING_SIZE = 12        # <-- YOU CAN CHANGE THIS
-SAVE_EVERY = 25          # save checkpoint every N epochs
-STATUS_EVERY = 20        # print status every N epochs
 
-# ============================================================
-# PATHS
-# ============================================================
+PADDING_SIZE = 12
+SAVE_EVERY = 25
+STATUS_EVERY = 20
+
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "dataset_graph")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
@@ -30,9 +24,7 @@ NORM_PATH = os.path.join(NPY_DIR, "normalization.npz")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 os.makedirs(NPY_DIR, exist_ok=True)
 
-# ============================================================
-# CONSTANTS
-# ============================================================
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 HID_DIM = 64
 Z_DIM = 32
@@ -44,9 +36,8 @@ BETA_KL = 1e-4
 WARMUP_EPOCHS = 20
 GRAD_CLIP_NORM = 5.0
 
-# ============================================================
-# GraphVAE MODEL
-# ============================================================
+
+
 class GraphEncoder(nn.Module):
     def __init__(self, in_dim, hid_dim, z_dim, heads=4):
         super().__init__()
@@ -104,9 +95,8 @@ class GraphVAE(nn.Module):
         logits = self.decoder(z)
         return logits, mu, logvar
 
-# ============================================================
-# DATA LOADING
-# ============================================================
+
+
 def load_graph_json(path):
     with open(path, "r") as f:
         obj = json.load(f)
@@ -144,9 +134,7 @@ def build_dataset(folder):
             out.append(d)
     return out
 
-# ============================================================
-# NORMALIZATION
-# ============================================================
+
 def normalize_dataset(dataset):
     xs = torch.cat([d.x for d in dataset], dim=0)
     mean = xs.mean(0, keepdim=True)
@@ -158,9 +146,7 @@ def normalize_dataset(dataset):
 
     return mean.squeeze(0), std.squeeze(0)
 
-# ============================================================
-# NPY EXPORT (with user-chosen padding)
-# ============================================================
+
 def export_dataset_to_npy(dataset, out_dir, mean, std):
     F_dim = dataset[0].x.size(1)
 
@@ -186,9 +172,7 @@ def export_dataset_to_npy(dataset, out_dir, mean, std):
 
     np.savez(NORM_PATH, mean=mean.numpy(), std=std.numpy())
 
-# ============================================================
-# LOSSES
-# ============================================================
+
 def recon_loss(logits, adj_true):
     adj_true = adj_true.float().to(logits.device)
     pos = adj_true.sum()
@@ -200,9 +184,7 @@ def kl_loss(mu, logvar):
     logvar = logvar.clamp(min=-10, max=10)
     return -0.5 * torch.mean(1 + logvar - mu.pow(2) - logvar.exp())
 
-# ============================================================
-# TRAINING
-# ============================================================
+
 def main():
     dataset = build_dataset(DATA_DIR)
     in_dim = dataset[0].x.size(1)
@@ -242,3 +224,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
