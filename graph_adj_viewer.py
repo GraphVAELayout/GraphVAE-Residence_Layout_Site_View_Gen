@@ -6,11 +6,11 @@ import numpy as np
 import math
 import random
 
-# Node feature index meaning
+# Node feature index
 IDX_INSIDE  = 0
 IDX_OUTSIDE = 1
 
-NODE_R = 18          # radius of node circle
+NODE_R = 18
 CANVAS_W = 900
 CANVAS_H = 700
 
@@ -25,10 +25,6 @@ def load_graph_json(path):
 
 
 def compute_layout(n):
-    """
-    Simple circular layout.
-    Places n nodes evenly around a circle.
-    """
     cx, cy = CANVAS_W // 2, CANVAS_H // 2
     radius = min(CANVAS_W, CANVAS_H) * 0.35
 
@@ -77,7 +73,7 @@ class GraphViewer(tk.Tk):
         n = len(node_names)
         positions = compute_layout(n)
 
-        # Draw edges (undirected - avoid duplicates)
+        # Draw edges
         seen = set()
         for (u, v) in A:
             u, v = int(u), int(v)
@@ -121,3 +117,4 @@ class GraphViewer(tk.Tk):
 if __name__ == "__main__":
     app = GraphViewer()
     app.mainloop()
+
