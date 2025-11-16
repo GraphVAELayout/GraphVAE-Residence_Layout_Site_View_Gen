@@ -22,13 +22,14 @@ for fname in sorted(os.listdir(folder)):
     print("X nodes:", n_x, "A shape:", A.shape)
 
     if n_a0 != n_x or n_a1 != n_x:
-        print("  ❌ mismatch between X and A sizes!")
+        print("mismatch between X and A sizes!")
 
     src, dst = np.nonzero(A)
     if src.size > 0:
         max_idx = max(src.max(), dst.max())
         print("  max edge index:", max_idx)
         if max_idx >= n_x:
-            print("  ❌ edge index out of range!")
+            print("edge index out of range!")
     else:
         print("  (no edges)")
+
