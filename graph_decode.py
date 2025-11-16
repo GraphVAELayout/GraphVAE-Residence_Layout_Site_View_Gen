@@ -1,14 +1,3 @@
-# graphvae_generate.py
-#
-# Decode / regenerate graphs from a trained GraphVAE model.
-# For each *_graph.json in dataset_graph, this script:
-#   1) loads the graph and normalizes X using saved mean/std
-#   2) encodes it with the trained VAE
-#   3) decodes a new adjacency matrix
-#   4) writes a new JSON file with the same nodes/X but new A/E
-#
-# Output: outputs/generated_graphs/plan_XXXXX_graph_decoded.json
-
 import os
 import json
 import numpy as np
@@ -18,9 +7,9 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv, GATConv
 
-# ============================================================
-# PATHS + SETTINGS (match graphvae_train.py)
-# ============================================================
+
+
+
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR   = os.path.join(BASE_DIR, "dataset_graph")
 OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
@@ -35,12 +24,12 @@ DEVICE       = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 HID_DIM      = 64
 Z_DIM        = 32
 GAT_HEADS    = 4
-EDGE_THR     = 0.5      # threshold on sigmoid(logits) for edges
-USE_MU_ONLY  = True     # deterministic decode: z = mu (no sampling)
+EDGE_THR     = 0.5 
+USE_MU_ONLY  = True
 
-# ============================================================
-# Model (copied from graphvae_train.py)
-# ============================================================
+
+
+
 class GraphEncoder(nn.Module):
     def __init__(self, in_dim, hid_dim, z_dim, heads=4):
         super().__init__()
@@ -99,29 +88,22 @@ class GraphVAE(nn.Module):
         return logits, mu, logvar
 
 
-# ============================================================
-# Helpers: normalization + data loading (JSON → Data)
-# ============================================================
+
+
 def load_normalization(norm_path):
-    """Load feature mean/std used during training."""
     arr = np.load(norm_path)
-    mean = torch.from_numpy(arr["mean"]).float()  # [F]
-    std = torch.from_numpy(arr["std"]).float()    # [F]
+    mean = torch.from_numpy(arr["mean"]).float()
+    std = torch.from_numpy(arr["std"]).float()
     return mean, std
 
 
 def load_graph_for_inference(path, mean, std):
-    """
-    Load one *_graph.json, normalize X with given mean/std,
-    and return (Data, raw_json_obj).
-    """
     with open(path, "r", encoding="utf-8") as f:
         obj = json.load(f)
 
     X = np.array(obj["X"], dtype=np.float32)          # [N, F]
     N, F_dim = X.shape
 
-    # A is stored as edge list [[u,v], ...]
     edges = np.array(obj["A"], dtype=np.int64).reshape(-1, 2)
     if edges.size > 0:
         # handle possible 1-based indices
@@ -130,14 +112,14 @@ def load_graph_for_inference(path, mean, std):
     else:
         edges = np.zeros((0, 2), dtype=np.int64)
 
-    # Dense adj not strictly needed here, but may be useful
+
     adj = np.zeros((N, N), dtype=np.float32)
     if edges.size > 0:
         u, v = edges[:, 0], edges[:, 1]
         adj[u, v] = 1.0
         adj[v, u] = 1.0
 
-    # Normalize X with training stats
+
     mean_t = mean.view(1, -1)
     std_t = std.view(1, -1)
     x = torch.from_numpy(X)
@@ -168,9 +150,8 @@ def infer_edge_type(u, v, X):
     return 0 if (inside_u and inside_v) else 1
 
 
-# ============================================================
-# Main generation routine
-# ============================================================
+
+
 def decode_graphs():
     # Load mean/std and checkpoint
     mean, std = load_normalization(NORM_PATH)
@@ -251,3 +232,4 @@ def decode_graphs():
 
 if __name__ == "__main__":
     decode_graphs()
+
