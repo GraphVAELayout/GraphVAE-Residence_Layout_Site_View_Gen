@@ -1,37 +1,25 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-ResPlan Axes Viewer — with live sliders
-- Grid grey slider (0–255)
-- Pixel scale slider (1.00–10.00 inches per pixel)
-- Everything updates dynamically
-- Secondary axes in feet (auto updates with scale)
-- Minor (sub) grids
-- Opening colors configurable via constants
-"""
-
 import os, json, math
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-# plotting
+
 import matplotlib
 matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
-# geometry
+
 from shapely.geometry import shape as shp_shape, Polygon, MultiPolygon
 from shapely.ops import unary_union
 
-# ──────────────────────────────────────────────────────────────────────────────
-# PALETTES (Pastel default)
+
+
 PALETTE_PASTEL = ["#d3c18d", "#ffffb3", "#bebada", "#fb8072", "#a0356e",
                   "#fdb462", "#de8069", "#fccde5", "#d9d9d9", "#bc80bd"]
 PALETTE_MUTED  = ["#c4840e", "#ffd92f", "#8da0cb", "#e78ac3", "#c63800",
                   "#fc8d62","#e5c494","#b3b3b3","#9e1b4b","#7570b3"]
 PALETTE_TAB10  = ["#b199b0","#572F3E","#a02c51","#996e6e","#9467bd",
-                  "#8c564b","#c5aabd","#cacaca","#ff825d","#eab189"]  # fix invalid 8-digit hex
+                  "#8c564b","#c5aabd","#cacaca","#ff825d","#eab189"]
 
 REDDISH_LIGHT = ["#8B5E3C","#FFB347","#FF6B6B","#C39BD3","#FFE066"]
 REDDISH_DARK  = ["#5A3C27","#D97A00","#CC4C4C","#8E5AA8","#C9B400"]
@@ -41,22 +29,20 @@ ROOM_TYPES_ORDER = ["living","living_room","bedroom","bathroom","kitchen","stora
                     "stair","balcony","veranda","garden","parking","land"]
 NON_ROOMS = {"wall","window","door","front_door","neighbor","inner","land"}
 
-# Use Pastel for matplotlib's default cycle so anything uncolored still matches
+
 plt.rcParams["axes.prop_cycle"] = plt.cycler(color=PALETTE_PASTEL)
 
-# ──────────────────────────────────────────────────────────────────────────────
-# OPENING COLORS (edit these to control window/door colors)
-WINDOW_FACE = "#6b6b6b"   # ← your previous green; change to what you want
+
+
+WINDOW_FACE = "#6b6b6b"
 WINDOW_EDGE = "#3b3b3b"
 DOOR_FACE   = "#C5C5C5"
 DOOR_EDGE   = "#505050"
 FRONT_DOOR_FACE = "#616161"
 FRONT_DOOR_EDGE = "#000000"
-# Example alternatives:
-# WINDOW_FACE = "#9ad0f5"; WINDOW_EDGE = "#3876a4"     # bluish windows
-# WINDOW_FACE = "#c7ffd8"; WINDOW_EDGE = "#3aa774"     # pale mint
 
-# ──────────────────────────────────────────────────────────────────────────────
+
+
 
 def palette_map(palette_name: str, present_types):
     pts = list(present_types) if present_types else ROOM_TYPES_ORDER
@@ -146,9 +132,9 @@ class AxesViewer(tk.Tk):
         self.layers = {}
         self.palette_name = tk.StringVar(value="Pastel")
 
-        # dynamic units
-        self.in_per_px = tk.DoubleVar(value=2.4)   # inches per pixel (1.00–10.00)
-        self.grid_grey = tk.DoubleVar(value=220.0) # 0–255
+
+        self.in_per_px = tk.DoubleVar(value=2.4)
+        self.grid_grey = tk.DoubleVar(value=220.0)
         self.show_total_area = tk.BooleanVar(value=True)
 
         self._build_topbar()
@@ -185,7 +171,6 @@ class AxesViewer(tk.Tk):
     def _build_controls(self):
         ctl = ttk.Frame(self); ctl.pack(side=tk.TOP, fill=tk.X, padx=10, pady=(0,8))
 
-        # Grid grey slider
         row1 = ttk.Frame(ctl); row1.pack(fill=tk.X, pady=4)
         ttk.Label(row1, text="Grid Grey").pack(side=tk.LEFT)
         self.lbl_grey_val = ttk.Label(row1, text=f"{int(self.grid_grey.get())}")
@@ -194,7 +179,7 @@ class AxesViewer(tk.Tk):
                        command=self._on_slider_change)
         s1.pack(fill=tk.X, expand=True, padx=10)
 
-        # Pixel scale slider (inches per pixel)
+
         row2 = ttk.Frame(ctl); row2.pack(fill=tk.X, pady=4)
         ttk.Label(row2, text="Pixel Scale (inches per pixel)").pack(side=tk.LEFT)
         self.lbl_scale_val = ttk.Label(row2, text=f"{self.in_per_px.get():.2f} in/px")
@@ -208,13 +193,13 @@ class AxesViewer(tk.Tk):
 
     def _build_body(self):
         body = ttk.Frame(self); body.pack(fill=tk.BOTH, expand=True, padx=10, pady=6)
-        # Left listbox
+
         left = ttk.Frame(body, width=300); left.pack(side=tk.LEFT, fill=tk.Y)
         ttk.Label(left, text="Plans").pack(anchor="w")
         self.lst = tk.Listbox(left, selectmode=tk.SINGLE); self.lst.pack(fill=tk.BOTH, expand=True)
         self.lst.bind("<<ListboxSelect>>", lambda e: self.on_file_select())
 
-        # Right plot
+
         right = ttk.Frame(body); right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(12,0))
         self.fig = plt.Figure(figsize=(8.0,7.0), dpi=100)
         self.ax = self.fig.add_subplot(111)
@@ -224,8 +209,6 @@ class AxesViewer(tk.Tk):
 
 
 
-
-    # --- Events ---
     def _on_slider_change(self, *_):
         self.lbl_grey_val.config(text=f"{int(self.grid_grey.get())}")
         self.lbl_scale_val.config(text=f"{self.in_per_px.get():.2f} in/px")
@@ -233,8 +216,6 @@ class AxesViewer(tk.Tk):
 
 
 
-
-    # --- IO ---
     def choose_folder(self):
         folder = filedialog.askdirectory(title="Select folder with plan_*.json")
         if not folder: return
@@ -268,8 +249,6 @@ class AxesViewer(tk.Tk):
 
 
 
-
-    # --- Geometry helpers ---
     def _collect_layers(self, plan):
         return _collect_layers(plan)
 
@@ -290,8 +269,6 @@ class AxesViewer(tk.Tk):
 
 
     def _label_room_pieces(self, ax, name, geom, color):
-        """Label each polygon piece separately; show true per-piece W×H from its bbox.
-        Also compute total area across all pieces for a single small header label."""
         try:
             ft_per_px = self.in_per_px.get() / 12.0
             sqft_per_sqpx = ft_per_px * ft_per_px
@@ -300,11 +277,11 @@ class AxesViewer(tk.Tk):
             if not pieces:
                 return
 
-            # Total area across all pieces (shown once, near the largest piece)
+
             total_area_ft2 = sum(p.area for p in pieces) * sqft_per_sqpx
             largest = max(pieces, key=lambda p: p.area)
 
-            # Label each piece with its own W×H and area
+
             for idx, p in enumerate(pieces, 1):
                 minx, miny, maxx, maxy = p.bounds
                 w_ft = (maxx - minx) * ft_per_px
@@ -314,7 +291,7 @@ class AxesViewer(tk.Tk):
                 rp = p.representative_point()
                 x, y = rp.x, rp.y
 
-                # If there are multiple pieces, append -1, -2 … to the name
+
                 piece_name = f"{name}-{idx}" if len(pieces) > 1 else name
 
                 txt = f"{piece_name}\n{w_ft:.1f}×{h_ft:.1f} ft\n{piece_area_ft2:.1f} ft²"
@@ -328,7 +305,7 @@ class AxesViewer(tk.Tk):
                     zorder=10, clip_on=False
                 )
 
-            # Put a small "total" tag at the largest piece so you see combined area once
+
             if self.show_total_area.get():
                 rpL = largest.representative_point()
                 ax.text(
@@ -345,18 +322,18 @@ class AxesViewer(tk.Tk):
 
 
 
-    # --- Render ---
+
     def render(self):
         self.ax.clear()
 
-        # grid color from slider (major)
+
         grid_color = grey_hex(self.grid_grey.get())
         self.ax.grid(True, which="major", linestyle="-", linewidth=0.3, color=grid_color)
 
-        # minor (sub) grids — thinner & lighter
+
         from matplotlib.ticker import AutoMinorLocator
         self.ax.minorticks_on()
-        self.ax.xaxis.set_minor_locator(AutoMinorLocator(5))  # 4 minor intervals → 5 ticks per major
+        self.ax.xaxis.set_minor_locator(AutoMinorLocator(5)) 
         self.ax.yaxis.set_minor_locator(AutoMinorLocator(5))
         self.ax.grid(True, which="minor", linestyle="-", linewidth=0.15, alpha=0.35, color=grid_color)
 
@@ -365,7 +342,7 @@ class AxesViewer(tk.Tk):
         if not self.layers:
             self.canvas.draw(); return
 
-        # Prepare color map
+
         room_layers = [k for k in self.layers if k not in NON_ROOMS]
         cmap = palette_map("Pastel", room_layers) if self.palette_name.get() == "Pastel" \
                else palette_map(self.palette_name.get(), room_layers)
@@ -374,13 +351,13 @@ class AxesViewer(tk.Tk):
         if "wall" in self.layers:
             self._draw_polycollection(self.ax, self.layers["wall"], face="#000000", edge="#000000", alpha=0.5, lw=1.0)
 
-        # Draw rooms + labels
+        # Draw rooms
         for k in room_layers:
             col = cmap.get(k, FALLBACK_GREY)
             self._draw_polycollection(self.ax, self.layers[k], face=col, edge="#333333", alpha=0.65, lw=0.8)
             self._label_room_pieces(self.ax, k, self.layers[k], col)
 
-        # Openings (now controlled by constants at top)
+        # Openings
         if "window" in self.layers:
             self._draw_polycollection(self.ax, self.layers["window"], face=WINDOW_FACE, edge=WINDOW_EDGE, alpha=0.9, lw=0.6)
         if "door" in self.layers:
@@ -394,7 +371,7 @@ class AxesViewer(tk.Tk):
         self.ax.set_xlabel(f"X (px)   —   1 px = {in_per_px:.2f} in = {ft_per_px:.3f} ft")
         self.ax.set_ylabel("Y (px)")
 
-        # Secondary axes in feet (top & right) — auto update each render
+        # Secondary axes
         def px_to_ft(x): return x * ft_per_px
         def ft_to_px(x): return x / ft_per_px
         secx = self.ax.secondary_xaxis('top', functions=(px_to_ft, ft_to_px))
@@ -430,3 +407,4 @@ class AxesViewer(tk.Tk):
 
 if __name__ == "__main__":
     AxesViewer().mainloop()
+
