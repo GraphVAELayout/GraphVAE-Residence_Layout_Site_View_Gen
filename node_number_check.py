@@ -2,12 +2,7 @@ import os
 import json
 import numpy as np
 
-# ------------------------------------------------------------
-# INSERT YOUR FOLDER PATH HERE
-# Example: FOLDER = r"C:\Users\Shafiul\Desktop\dataset_graph"
-# ------------------------------------------------------------
 FOLDER = r"D:\ARCHITECTURE\00.Article CADRIA\GraphVAE\Dataset\dataset_graph"
-
 
 def get_max_nodes(folder):
     max_nodes = 0
@@ -44,3 +39,4 @@ def get_max_nodes(folder):
 
 if __name__ == "__main__":
     get_max_nodes(FOLDER)
+
