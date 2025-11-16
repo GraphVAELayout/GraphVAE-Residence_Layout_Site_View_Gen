@@ -1,39 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-graph_prep_gui.py
-
-Prepare graph JSON from plan_*.json floorplans.
-
-GUI:
-- Select folder with plan JSONs.
-- Choose outside node 'view types' for N / S / E / W.
-- Enter a global window-to-wall ratio (WWR) used as a node feature.
-- Batch convert → writes one *_graph.json per input file.
-
-Graph JSON structure (per file):
-
-{
-  "Z": [num_nodes, 0.0],          # graph-level features (2nd is placeholder)
-  "node_names": [...],            # list of node names (rooms + outside nodes)
-  "node_meta": [                  # list of dicts with string meta
-      {"name": "...", "kind": "inside"/"outside", "room_type": "...", "view_type": "..."},
-      ...
-  ],
-  "X": [                          # node features (numeric)
-      [inside_flag, outside_flag,
-       area, bbox_w, bbox_h, minx, miny, maxx, maxy,
-       wwr],
-      ...
-  ],
-  "A": [ [u, v], ... ],           # undirected edges (indices in node_names)
-  "E": [ [edge_type], ... ]       # edge features: 0 = room-room adj, 1 = room-outside view
-}
-
-This is intentionally simple & robust; you can extend the features later
-(e.g. add view scores, one-hot room types, etc.) without changing this GUI.
-"""
-
 import json
 import os
 import tkinter as tk
@@ -49,9 +13,7 @@ from view_calc import (
     VIEW_WEIGHTS,
 )
 
-# ---------------------------------------------------------------------
-# Helpers to read plan JSON and build graphs
-# ---------------------------------------------------------------------
+
 
 NON_ROOM_LAYERS = {
     "wall", "window", "door", "front_door",
@@ -71,10 +33,6 @@ def _safe_iter_geoms(g):
 
 
 def _collect_rooms(plan):
-    """
-    Return dict name -> shapely geometry for all 'room' layers,
-    skipping walls/windows/etc and empty / zero-area geometries.
-    """
     rooms = {}
     for name, obj in plan.items():
         if name in NON_ROOM_LAYERS:
@@ -88,7 +46,6 @@ def _collect_rooms(plan):
         except Exception:
             continue
         if g.is_empty:
-            # <-- this skips your empty 'garden' layer
             continue
         if g.area <= 0:
             continue
@@ -97,7 +54,6 @@ def _collect_rooms(plan):
 
 
 def _building_bounds(plan, rooms):
-    """Get overall bounding box of building from 'inner' or union of rooms."""
     if "inner" in plan and isinstance(plan["inner"], dict):
         try:
             g_inner = shp_shape(plan["inner"])
@@ -111,12 +67,10 @@ def _building_bounds(plan, rooms):
             return u.bounds
         except Exception:
             pass
-    # fallback
     return (0.0, 0.0, 1.0, 1.0)
 
 
 def _room_bbox(geom):
-    """Return (minx, miny, maxx, maxy, w, h, area) for a room geometry."""
     minx, miny, maxx, maxy = geom.bounds
     w = maxx - minx
     h = maxy - miny
@@ -125,24 +79,7 @@ def _room_bbox(geom):
 
 
 def _build_graph_from_plan(plan, side_cfg, global_wwr):
-    """
-    Convert floorplan JSON + outside side config into a graph dict.
-    side_cfg: dict like {"north": "sky", "south": "vegetation", ...}
-    global_wwr: float
-
-    New:
-    - calls view_calc to compute:
-        * per-room view_score (0–1)
-        * graph-level view_score (0–1)
-    - node features X gain an extra 'view_score' column at the end
-    - Z = [num_nodes, graph_view_score]
-    """
-    # -----------------------------
-    # 1) Collect rooms (inside nodes)
-    # -----------------------------
     rooms = _collect_rooms(plan)
-
-    # If there are no rooms, return an empty graph
     if not rooms:
         return {
             "Z": [0.0, 0.0],
@@ -153,16 +90,14 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
             "E": [],
         }
 
-    # Building bounds
-    minx_b, miny_b, maxx_b, maxy_b = _building_bounds(plan, rooms)
-    tol = 1e-6  # tolerance for matching edges to building boundary
 
-    # -----------------------------
-    # 2) Build layers for view_calc
-    # -----------------------------
+    minx_b, miny_b, maxx_b, maxy_b = _building_bounds(plan, rooms)
+    tol = 1e-6
+
+
     layers_for_view = {}
 
-    # inner
+
     if "inner" in plan and isinstance(plan["inner"], dict):
         try:
             g_inner = shp_shape(plan["inner"])
@@ -171,7 +106,7 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
         except Exception:
             pass
 
-    # window
+
     if "window" in plan and isinstance(plan["window"], dict):
         try:
             g_win = shp_shape(plan["window"])
@@ -180,13 +115,11 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
         except Exception:
             pass
 
-    # rooms (re-use the geometries we already have)
+
     for rname, geom in rooms.items():
         layers_for_view[rname] = geom
 
-    # -----------------------------
-    # 3) Build OutsideNode objects for view_calc
-    # -----------------------------
+
     outside_nodes_for_view = []
     cx = 0.5 * (minx_b + maxx_b)
     cy = 0.5 * (miny_b + maxy_b)
@@ -201,15 +134,13 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
             OutsideNode(name=side, category=vtype, position=(x, y))
         )
 
-    # place one node per façade
+
     _add_outside("north", cx, maxy_b + margin)
     _add_outside("south", cx, miny_b - margin)
     _add_outside("west",  minx_b - margin, cy)
     _add_outside("east",  maxx_b + margin, cy)
 
-    # -----------------------------
-    # 4) View calculation (grid → room_scores → graph_score)
-    # -----------------------------
+
     room_scores = {}
     graph_view_score = 0.0
 
@@ -231,9 +162,7 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
             )
             graph_view_score = compute_graph_score(room_scores)
 
-    # -----------------------------
-    # 5) Node list: inside rooms first
-    # -----------------------------
+
     room_names = sorted(rooms.keys())
     node_names = list(room_names)
 
@@ -264,13 +193,11 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
             float(bminx), float(bminy),
             float(bmaxx), float(bmaxy),
             wwr,
-            view_score,          # ← NEW: room view score
+            view_score,
         ])
 
-    # -----------------------------
-    # 6) Outside nodes (graph nodes, with weight as view feature)
-    # -----------------------------
-    outside_nodes = []  # list of (node_name, side, view_type)
+
+    outside_nodes = []
     for side in ["north", "south", "east", "west"]:
         vtype = side_cfg.get(side, "none")
         if vtype is None or vtype == "none":
@@ -285,7 +212,7 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
         bw = bh = 0.0
         bminx = bminy = bmaxx = bmaxy = 0.0
 
-        # use VIEW_WEIGHTS as a simple view_score for outside nodes
+
         view_score = float(VIEW_WEIGHTS.get(vtype, 0.0))
 
         node_meta.append({
@@ -300,18 +227,17 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
             float(bw), float(bh),
             float(bminx), float(bminy),
             float(bmaxx), float(bmaxy),
-            0.0,           # WWR not relevant for outside node
-            view_score,    # ← NEW: façade weight
+            0.0,
+            view_score,
         ])
         node_names.append(node_name)
 
     node_index = {name: idx for idx, name in enumerate(node_names)}
 
-    # -----------------------------
-    # 7) Edges: room-room adjacency
-    # -----------------------------
+
+  
     A = []
-    E = []  # [edge_type]; 0 = room-room adjacency, 1 = view edge
+    E = []
 
     ritems = list(rooms.items())
     for i in range(len(ritems)):
@@ -335,9 +261,8 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
             except Exception:
                 continue
 
-    # -----------------------------
-    # 8) Room–outside view edges (same heuristic as before)
-    # -----------------------------
+
+  
     for rname, geom in rooms.items():
         idx_r = node_index.get(rname)
         if idx_r is None:
@@ -361,13 +286,12 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
             if idx_o is None:
                 continue
             A.append([idx_r, idx_o])
-            E.append([1])  # view edge
+            E.append([1])
             A.append([idx_o, idx_r])
             E.append([1])
 
-    # -----------------------------
-    # 9) Graph-level features Z
-    # -----------------------------
+
+  
     num_nodes = len(node_names)
     Z = [float(num_nodes), float(graph_view_score)]
 
@@ -383,9 +307,7 @@ def _build_graph_from_plan(plan, side_cfg, global_wwr):
 
 
 
-# ---------------------------------------------------------------------
-# Tkinter GUI
-# ---------------------------------------------------------------------
+
 
 class GraphPrepGUI(tk.Tk):
     def __init__(self):
@@ -396,7 +318,7 @@ class GraphPrepGUI(tk.Tk):
         self.folder = None
         self.files = []
 
-        # outside node type variables
+
         self.side_vars = {
             "north": tk.StringVar(value="sky"),
             "south": tk.StringVar(value="vegetation"),
@@ -410,7 +332,6 @@ class GraphPrepGUI(tk.Tk):
         self._build_ui()
 
     def _build_ui(self):
-        # top bar
         top = ttk.Frame(self)
         top.pack(side="top", fill="x", padx=8, pady=6)
 
@@ -419,7 +340,7 @@ class GraphPrepGUI(tk.Tk):
         self.lbl_folder = ttk.Label(top, text="", anchor="w")
         self.lbl_folder.pack(side="left", padx=8)
 
-        # outside node types frame
+
         frm_out = ttk.LabelFrame(self, text="Outside node types")
         frm_out.pack(side="top", fill="x", padx=8, pady=(4, 4))
 
@@ -436,7 +357,7 @@ class GraphPrepGUI(tk.Tk):
             )
             cb.grid(row=row, column=1, padx=4, pady=2, sticky="w")
 
-        # global WWR
+
         frm_wwr = ttk.Frame(self)
         frm_wwr.pack(side="top", fill="x", padx=8, pady=(4, 4))
         ttk.Label(frm_wwr, text="Global WWR (0–1):", width=16)\
@@ -444,7 +365,7 @@ class GraphPrepGUI(tk.Tk):
         ttk.Entry(frm_wwr, textvariable=self.wwr_var, width=10)\
             .pack(side="left", padx=4)
 
-        # bottom: info + button
+
         frm_bottom = ttk.Frame(self)
         frm_bottom.pack(side="top", fill="x", padx=8, pady=(4, 4))
 
@@ -457,14 +378,13 @@ class GraphPrepGUI(tk.Tk):
                    command=self.batch_convert)\
             .pack(side="right")
 
-        # spacer for future log output
+
         self.txt_log = tk.Text(self, height=12, wrap="word")
         self.txt_log.pack(side="top", fill="both", expand=True,
                           padx=8, pady=(4, 8))
         self.txt_log.insert("end", "Select a folder to begin...\n")
         self.txt_log.config(state="disabled")
 
-    # ------------------------------------------------------------ IO
 
     def choose_folder(self):
         folder = filedialog.askdirectory(title="Select folder with plan JSONs")
@@ -539,7 +459,8 @@ class GraphPrepGUI(tk.Tk):
         self.txt_log.config(state="disabled")
 
 
-# ---------------------------------------------------------------------
+
 if __name__ == "__main__":
     app = GraphPrepGUI()
     app.mainloop()
+
